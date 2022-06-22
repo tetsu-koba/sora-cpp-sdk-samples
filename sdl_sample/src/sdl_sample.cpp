@@ -41,9 +41,10 @@ class SDLSample : public std::enable_shared_from_this<SDLSample>,
       : sora::SoraDefaultClient(config), config_(config) {}
 
   void Run() {
-    renderer_.reset(
-        new SDLRenderer(config_.width, config_.height, config_.fullscreen));
-
+    renderer_ = nullptr;
+    if (config_.role != "sendonly" || config_.show_me) {
+      renderer_.reset(new SDLRenderer(config_.width, config_.height, config_.fullscreen));
+    }
     if (config_.role != "recvonly") {
       sora::CameraDeviceCapturerConfig cam_config;
       cam_config.width = 640;
@@ -88,13 +89,17 @@ class SDLSample : public std::enable_shared_from_this<SDLSample>,
 
     conn_->Connect();
 
-    renderer_->SetDispatchFunction([this](std::function<void()> f) {
-      if (ioc_->stopped())
-        return;
-      boost::asio::dispatch(ioc_->get_executor(), f);
-    });
-
-    ioc_->run();
+    if (renderer_) {
+      renderer_->SetDispatchFunction([this](std::function<void()> f) {
+	if (ioc_->stopped())
+	  return;
+	boost::asio::dispatch(ioc_->get_executor(), f);
+      });
+      ioc_->run();
+      renderer_->SetDispatchFunction(nullptr);
+    } else {
+      ioc_->run();
+    }
   }
 
   void OnSetOffer() override {
@@ -113,7 +118,9 @@ class SDLSample : public std::enable_shared_from_this<SDLSample>,
   void OnDisconnect(sora::SoraSignalingErrorCode ec,
                     std::string message) override {
     RTC_LOG(LS_INFO) << "OnDisconnect: " << message;
-    renderer_.reset();
+    if (renderer_) {
+      renderer_.reset();
+    }
     ioc_->stop();
   }
 
@@ -121,16 +128,18 @@ class SDLSample : public std::enable_shared_from_this<SDLSample>,
       override {
     auto track = transceiver->receiver()->track();
     if (track->kind() == webrtc::MediaStreamTrackInterface::kVideoKind) {
-      renderer_->AddTrack(
-          static_cast<webrtc::VideoTrackInterface*>(track.get()));
+      if (renderer_) {
+	renderer_->AddTrack(static_cast<webrtc::VideoTrackInterface*>(track.get()));
+      }
     }
   }
   void OnRemoveTrack(
       rtc::scoped_refptr<webrtc::RtpReceiverInterface> receiver) override {
     auto track = receiver->track();
     if (track->kind() == webrtc::MediaStreamTrackInterface::kVideoKind) {
-      renderer_->RemoveTrack(
-          static_cast<webrtc::VideoTrackInterface*>(track.get()));
+      if (renderer_ ) {
+	renderer_->RemoveTrack(static_cast<webrtc::VideoTrackInterface*>(track.get()));
+      }
     }
   }
 
