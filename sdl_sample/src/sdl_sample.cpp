@@ -16,6 +16,7 @@ struct SDLSampleConfig : sora::SoraDefaultClientConfig {
   std::string channel_id;
   std::string role;
   std::string video_codec_type;
+  std::string metadata;
   bool multistream = false;
   int width = 640;
   int height = 480;
@@ -62,6 +63,12 @@ class SDLSample : public std::enable_shared_from_this<SDLSample>,
     config.multistream = config_.multistream;
     config.role = config_.role;
     config.video_codec_type = config_.video_codec_type;
+
+    // メタデータのパース
+    if (!config_.metadata.empty()) {
+      config.metadata = boost::json::parse(config_.metadata);
+    }
+
     conn_ = sora::SoraSignaling::Create(config);
 
     boost::asio::executor_work_guard<boost::asio::io_context::executor_type>
@@ -166,6 +173,18 @@ int main(int argc, char* argv[]) {
   app.add_option("--multistream", config.multistream,
                  "Use multistream (default: false)")
       ->transform(CLI::CheckedTransformer(bool_map, CLI::ignore_case));
+  auto is_json = CLI::Validator(
+      [](std::string input) -> std::string {
+        boost::json::error_code ec;
+        boost::json::parse(input);
+        if (ec) {
+          return "Value " + input + " is not JSON Value";
+        }
+        return std::string();
+      },
+      "JSON Value");
+  app.add_option("--metadata", config.metadata, "Signaling metadata used in connect message")
+    ->check(is_json);
 
   // SDL に関するオプション
   app.add_option("--width", config.width, "SDL window width");
