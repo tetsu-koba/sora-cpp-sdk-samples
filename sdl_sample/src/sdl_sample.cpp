@@ -29,6 +29,8 @@ struct SDLSampleConfig : sora::SoraDefaultClientConfig {
   std::string role;
   std::string video_codec_type;
   std::string metadata;
+  bool no_video_device = false;
+  bool no_audio_device = false;
   std::string video_device = "";
   std::string resolution = "VGA";
   int framerate = 30;
@@ -78,20 +80,24 @@ class SDLSample : public std::enable_shared_from_this<SDLSample>,
       renderer_.reset(new SDLRenderer(config_.width, config_.height, config_.fullscreen));
     }
     if (config_.role != "recvonly") {
-      auto size = config_.GetSize();
-      sora::CameraDeviceCapturerConfig cam_config;
-      cam_config.width = size.width;
-      cam_config.height = size.height;
-      cam_config.fps = config_.framerate;
-      cam_config.device_name = config_.video_device;
-      auto video_source = sora::CreateCameraDeviceCapturer(cam_config);
+      if (!config_.no_video_device) {
+	auto size = config_.GetSize();
+	sora::CameraDeviceCapturerConfig cam_config;
+	cam_config.width = size.width;
+	cam_config.height = size.height;
+	cam_config.fps = config_.framerate;
+	cam_config.device_name = config_.video_device;
+	auto video_source = sora::CreateCameraDeviceCapturer(cam_config);
 
-      audio_track_ = factory()->CreateAudioTrack(
-          GenerateRandomChars(),
-          factory()->CreateAudioSource(cricket::AudioOptions()));
-      video_track_ = factory()->CreateVideoTrack(GenerateRandomChars(), video_source);
-      if (config_.show_me) {
-        renderer_->AddTrack(video_track_.get());
+	video_track_ = factory()->CreateVideoTrack(GenerateRandomChars(), video_source);
+	if (config_.show_me) {
+	  renderer_->AddTrack(video_track_.get());
+	}
+      }
+      if (!config_.no_audio_device) {
+	audio_track_ = factory()->CreateAudioTrack(
+	   GenerateRandomChars(),
+	   factory()->CreateAudioSource(cricket::AudioOptions()));
       }
     }
 
@@ -210,6 +216,10 @@ int main(int argc, char* argv[]) {
       {{"verbose", 0}, {"info", 1}, {"warning", 2}, {"error", 3}, {"none", 4}});
   app.add_option("--log-level", log_level, "Log severity level threshold")
       ->transform(CLI::CheckedTransformer(log_level_map, CLI::ignore_case));
+  app.add_flag("--no-video-device", config.no_video_device,
+               "Do not use video device");
+  app.add_flag("--no-audio-device", config.no_audio_device,
+               "Do not use audio device");
   app.add_option("--video-device", config.video_device,
                  "Use the video input device specified by a name "
                  "(some device will be used if not specified)")
@@ -282,6 +292,7 @@ int main(int argc, char* argv[]) {
     rtc::LogMessage::LogThreads();
   }
 
+  config.use_audio_deivce = !config.no_audio_device;
   auto sdlsample = sora::CreateSoraClient<SDLSample>(config);
   sdlsample->Run();
 
