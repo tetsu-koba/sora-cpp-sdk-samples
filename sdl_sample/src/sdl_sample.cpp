@@ -2,6 +2,8 @@
 #include <sora/camera_device_capturer.h>
 #include <sora/sora_default_client.h>
 
+#include <regex>
+
 // CLI11
 #include <CLI/CLI.hpp>
 
@@ -27,11 +29,41 @@ struct SDLSampleConfig : sora::SoraDefaultClientConfig {
   std::string role;
   std::string video_codec_type;
   std::string metadata;
+  std::string video_device = "";
+  std::string resolution = "VGA";
+  int framerate = 30;
   bool multistream = false;
   int width = 640;
   int height = 480;
   bool show_me = false;
   bool fullscreen = false;
+
+  struct Size {
+    int width;
+    int height;
+  };
+  Size GetSize() {
+    if (resolution == "QVGA") {
+      return {320, 240};
+    } else if (resolution == "VGA") {
+      return {640, 480};
+    } else if (resolution == "HD") {
+      return {1280, 720};
+    } else if (resolution == "FHD") {
+      return {1920, 1080};
+    } else if (resolution == "4K") {
+      return {3840, 2160};
+    }
+
+    // 128x96 みたいな感じのフォーマット
+    auto pos = resolution.find('x');
+    if (pos == std::string::npos) {
+      return {16, 16};
+    }
+    auto width = std::atoi(resolution.substr(0, pos).c_str());
+    auto height = std::atoi(resolution.substr(pos + 1).c_str());
+    return {std::max(16, width), std::max(16, height)};
+  }
 };
 
 class SDLSample : public std::enable_shared_from_this<SDLSample>,
@@ -46,10 +78,12 @@ class SDLSample : public std::enable_shared_from_this<SDLSample>,
       renderer_.reset(new SDLRenderer(config_.width, config_.height, config_.fullscreen));
     }
     if (config_.role != "recvonly") {
+      auto size = config_.GetSize();
       sora::CameraDeviceCapturerConfig cam_config;
-      cam_config.width = 640;
-      cam_config.height = 480;
-      cam_config.fps = 30;
+      cam_config.width = size.width;
+      cam_config.height = size.height;
+      cam_config.fps = config_.framerate;
+      cam_config.device_name = config_.video_device;
       auto video_source = sora::CreateCameraDeviceCapturer(cam_config);
 
       audio_track_ = factory()->CreateAudioTrack(
@@ -176,6 +210,33 @@ int main(int argc, char* argv[]) {
       {{"verbose", 0}, {"info", 1}, {"warning", 2}, {"error", 3}, {"none", 4}});
   app.add_option("--log-level", log_level, "Log severity level threshold")
       ->transform(CLI::CheckedTransformer(log_level_map, CLI::ignore_case));
+  app.add_option("--video-device", config.video_device,
+                 "Use the video input device specified by a name "
+                 "(some device will be used if not specified)")
+      ->check(CLI::ExistingFile);
+  auto is_valid_resolution = CLI::Validator(
+      [](std::string input) -> std::string {
+        if (input == "QVGA" || input == "VGA" || input == "HD" ||
+            input == "FHD" || input == "4K") {
+          return std::string();
+        }
+
+        // 数値x数値、というフォーマットになっているか確認する
+        std::regex re("^[1-9][0-9]*x[1-9][0-9]*$");
+        if (std::regex_match(input, re)) {
+          return std::string();
+        }
+
+        return "Must be one of QVGA, VGA, HD, FHD, 4K, or "
+               "[WIDTH]x[HEIGHT].";
+      },
+      "");
+  app.add_option("--resolution", config.resolution,
+                 "Video resolution (one of QVGA, VGA, HD, FHD, 4K, or "
+                 "[WIDTH]x[HEIGHT])")
+      ->check(is_valid_resolution);
+  app.add_option("--framerate", config.framerate, "Video framerate")
+      ->check(CLI::Range(1, 60));
 
   // Sora に関するオプション
   app.add_option("--signaling-url", config.signaling_url, "Signaling URL")
