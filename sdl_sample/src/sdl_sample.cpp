@@ -39,6 +39,11 @@ struct SDLSampleConfig : sora::SoraDefaultClientConfig {
   int height = 480;
   bool show_me = false;
   bool fullscreen = false;
+  bool disable_echo_cancellation = false;
+  bool disable_auto_gain_control = false;
+  bool disable_noise_suppression = false;
+  bool disable_highpass_filter = false;
+  bool disable_residual_echo_detector = false;
 
   struct Size {
     int width;
@@ -95,9 +100,24 @@ class SDLSample : public std::enable_shared_from_this<SDLSample>,
 	}
       }
       if (!config_.no_audio_device) {
+	cricket::AudioOptions ao;
+	if (config_.disable_echo_cancellation)
+	  ao.echo_cancellation = false;
+	if (config_.disable_auto_gain_control)
+	  ao.auto_gain_control = false;
+	if (config_.disable_noise_suppression)
+	  ao.noise_suppression = false;
+	if (config_.disable_highpass_filter)
+	  ao.highpass_filter = false;
+	if (config_.disable_residual_echo_detector)
+	  ao.residual_echo_detector = false;
+	RTC_LOG(LS_INFO) << __FUNCTION__ << ": " << ao.ToString();
 	audio_track_ = factory()->CreateAudioTrack(
 	   GenerateRandomChars(),
 	   factory()->CreateAudioSource(cricket::AudioOptions()));
+	if (!audio_track_) {
+	  RTC_LOG(LS_WARNING) << __FUNCTION__ << ": Cannot create audio_track";
+	}
       }
     }
 
@@ -247,6 +267,19 @@ int main(int argc, char* argv[]) {
       ->check(is_valid_resolution);
   app.add_option("--framerate", config.framerate, "Video framerate")
       ->check(CLI::Range(1, 60));
+
+  // オーディオフラグ
+  app.add_flag("--disable-echo-cancellation", config.disable_echo_cancellation,
+               "Disable echo cancellation for audio");
+  app.add_flag("--disable-auto-gain-control", config.disable_auto_gain_control,
+               "Disable auto gain control for audio");
+  app.add_flag("--disable-noise-suppression", config.disable_noise_suppression,
+               "Disable noise suppression for audio");
+  app.add_flag("--disable-highpass-filter", config.disable_highpass_filter,
+               "Disable highpass filter for audio");
+  app.add_flag("--disable-residual-echo-detector",
+               config.disable_residual_echo_detector,
+               "Disable residual echo detector for audio");
 
   // Sora に関するオプション
   app.add_option("--signaling-url", config.signaling_url, "Signaling URL")
