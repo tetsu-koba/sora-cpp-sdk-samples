@@ -34,6 +34,7 @@ struct SDLSampleConfig : sora::SoraDefaultClientConfig {
   std::string video_device = "";
   std::string resolution = "VGA";
   int framerate = 30;
+  bool fixed_resolution = false;
   bool multistream = false;
   int width = 640;
   int height = 480;
@@ -95,8 +96,15 @@ class SDLSample : public std::enable_shared_from_this<SDLSample>,
 	auto video_source = sora::CreateCameraDeviceCapturer(cam_config);
 
 	video_track_ = factory()->CreateVideoTrack(GenerateRandomChars(), video_source);
-	if (config_.show_me) {
-	  renderer_->AddTrack(video_track_.get());
+	if (video_track_) {
+	  if (config_.fixed_resolution) {
+	    video_track_->set_content_hint(webrtc::VideoTrackInterface::ContentHint::kText);
+	  }
+	  if (renderer_ != nullptr && config_.show_me) {
+	    renderer_->AddTrack(video_track_.get());
+	  }
+	} else {
+	  RTC_LOG(LS_WARNING) << __FUNCTION__ << ": Cannot create video_track";
 	}
       }
       if (!config_.no_audio_device) {
@@ -267,6 +275,8 @@ int main(int argc, char* argv[]) {
       ->check(is_valid_resolution);
   app.add_option("--framerate", config.framerate, "Video framerate")
       ->check(CLI::Range(1, 60));
+  app.add_flag("--fixed-resolution", config.fixed_resolution,
+               "Maintain video resolution in degradation");
 
   // オーディオフラグ
   app.add_flag("--disable-echo-cancellation", config.disable_echo_cancellation,
