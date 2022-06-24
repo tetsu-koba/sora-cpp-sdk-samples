@@ -11,6 +11,16 @@
 #include <rtc_base/win/scoped_com_initializer.h>
 #endif
 
+std::string GenerateRandomChars(size_t length) {
+  std::string result;
+  rtc::CreateRandomString(length, &result);
+  return result;
+}
+
+std::string GenerateRandomChars() {
+  return GenerateRandomChars(32);
+}
+
 struct SDLSampleConfig : sora::SoraDefaultClientConfig {
   std::string signaling_url;
   std::string channel_id;
@@ -41,12 +51,10 @@ class SDLSample : public std::enable_shared_from_this<SDLSample>,
       cam_config.fps = 30;
       auto video_source = sora::CreateCameraDeviceCapturer(cam_config);
 
-      std::string audio_track_id = "0123456789abcdef";
-      std::string video_track_id = "0123456789abcdefg";
       audio_track_ = factory()->CreateAudioTrack(
-          audio_track_id,
+          GenerateRandomChars(),
           factory()->CreateAudioSource(cricket::AudioOptions()));
-      video_track_ = factory()->CreateVideoTrack(video_track_id, video_source);
+      video_track_ = factory()->CreateVideoTrack(GenerateRandomChars(), video_source);
       if (config_.show_me) {
         renderer_->AddTrack(video_track_.get());
       }
@@ -90,7 +98,7 @@ class SDLSample : public std::enable_shared_from_this<SDLSample>,
   }
 
   void OnSetOffer() override {
-    std::string stream_id = "0123456789abcdef";
+    std::string stream_id = GenerateRandomChars();
     if (audio_track_ != nullptr) {
       webrtc::RTCErrorOr<rtc::scoped_refptr<webrtc::RtpSenderInterface>>
           audio_result =
