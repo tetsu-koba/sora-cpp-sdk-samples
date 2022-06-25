@@ -14,6 +14,7 @@ set(CLI11_DIR "" CACHE PATH "CLI11 のルートディレクトリ")
 
 project(sora-sendonly C CXX)
 
+list(APPEND CMAKE_PREFIX_PATH ${SORA_DIR})
 list(APPEND CMAKE_MODULE_PATH ${SORA_DIR}/share/cmake)
 
 set(Boost_USE_STATIC_LIBS ON)
