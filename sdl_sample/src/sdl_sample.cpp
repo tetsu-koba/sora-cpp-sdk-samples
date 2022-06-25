@@ -122,7 +122,7 @@ class SDLSample : public std::enable_shared_from_this<SDLSample>,
 	RTC_LOG(LS_INFO) << __FUNCTION__ << ": " << ao.ToString();
 	audio_track_ = factory()->CreateAudioTrack(
 	   GenerateRandomChars(),
-	   factory()->CreateAudioSource(cricket::AudioOptions()));
+	   factory()->CreateAudioSource(ao));
 	if (!audio_track_) {
 	  RTC_LOG(LS_WARNING) << __FUNCTION__ << ": Cannot create audio_track";
 	}
