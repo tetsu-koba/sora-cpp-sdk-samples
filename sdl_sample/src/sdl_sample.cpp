@@ -31,6 +31,8 @@ struct SDLSampleConfig : sora::SoraDefaultClientConfig {
   std::string metadata;
   bool no_video_device = false;
   bool no_audio_device = false;
+  int video_bit_rate = 0;
+  int audio_bit_rate = 0;
   std::string video_device = "";
   std::string resolution = "VGA";
   int framerate = 30;
@@ -140,6 +142,8 @@ class SDLSample : public std::enable_shared_from_this<SDLSample>,
     config.multistream = config_.multistream;
     config.role = config_.role;
     config.video_codec_type = config_.video_codec_type;
+    config.video_bit_rate = config_.video_bit_rate;
+    config.audio_bit_rate = config_.audio_bit_rate;
 
     // メタデータのパース
     if (!config_.metadata.empty()) {
@@ -301,6 +305,12 @@ int main(int argc, char* argv[]) {
   app.add_option("--video-codec-type", config.video_codec_type,
                  "Video codec for send")
       ->check(CLI::IsMember({"", "VP8", "VP9", "AV1", "H264"}));
+  app.add_option("--video-bit-rate", config.video_bit_rate,
+                   "Video bit rate")
+      ->check(CLI::Range(0, 30000));
+  app.add_option("--audio-bit-rate", config.audio_bit_rate,
+                   "Audio bit rate")
+      ->check(CLI::Range(0, 510));
   app.add_option("--multistream", config.multistream,
                  "Use multistream (default: false)")
       ->transform(CLI::CheckedTransformer(bool_map, CLI::ignore_case));
