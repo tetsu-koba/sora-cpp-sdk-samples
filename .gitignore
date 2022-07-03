@@ -2,3 +2,5 @@
 /_install
 /_source
 /__pycache__
+*~
+*.old*
