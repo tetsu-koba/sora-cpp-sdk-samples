@@ -12,6 +12,7 @@
 
 // C
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #include <time.h>
 
@@ -23,6 +24,8 @@
 #include <errno.h>
 #include <fcntl.h>
 #include <sys/select.h>
+#include <sys/types.h>
+#include <sys/stat.h>
 #include <unistd.h>
 
 // WebRTC
@@ -59,12 +62,22 @@ PipeVideoCapturer::PipeVideoCapturer()
 int32_t PipeVideoCapturer::Init(const std::string& pipeName) {
   if (0 == pipeName.compare("-")) {
     _fd = 0;
-    return 0;
-  }
-  if ((_fd = open(pipeName.c_str(), O_RDONLY)) < 0) {
+  } else if ((_fd = open(pipeName.c_str(), O_RDONLY)) < 0) {
     RTC_LOG(LS_INFO) << "error in opening " << pipeName
                      << " errono = " << errno;
     return -1;
+  }
+  struct stat st;
+  if (!fstat(_fd, &st) && S_ISFIFO(st.st_mode)) {
+    int pipe_size = 1024 * 1024;
+    auto f = fopen ("/proc/sys/fs/pipe-max-size" , "r");
+    if (f != NULL) {
+      char buf[128];
+      if (fgets(buf, sizeof(buf), f)) {
+	pipe_size = atoi(buf);
+      }
+    }
+    fcntl(_fd, F_SETPIPE_SZ, pipe_size);
   }
   return 0;
 }
